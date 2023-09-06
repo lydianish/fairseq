@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
-from torch.nn import MSELoss
+from torch.nn import MSELoss, CosineEmbeddingLoss
 
 from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
@@ -17,11 +17,10 @@ from fairseq.criterions import FairseqCriterion, register_criterion
 
 @register_criterion("encoder_similarity")
 class EncoderSimilarityCriterion(FairseqCriterion):
-    def __init__(self, task, sentence_avg, contrast, margin):
+    def __init__(self, task, sentence_avg, contrast, margin, mse):
         super().__init__(task)
         self.sentence_avg = sentence_avg
-        self.loss = torch.nn.CosineEmbeddingLoss(margin=margin, reduction="sum")
-        self.mse_loss = MSELoss()
+        self.loss = CosineEmbeddingLoss(margin=margin, reduction="sum") if not mse else MSELoss(reduction="sum")
         self.contrast = contrast
 
     @staticmethod
@@ -33,6 +32,8 @@ class EncoderSimilarityCriterion(FairseqCriterion):
 
         parser.add_argument('--margin', default=0., type=float,
                             help='cosine margin for negative sampling')
+        parser.add_argument('--mse', default=False, action='store_true',
+                            help='use MSE as distillation loss (instead of cosine)')
         # fmt: on
 
     def forward(self, model, sample, teacher_order, reduce=True):
@@ -74,7 +75,10 @@ class EncoderSimilarityCriterion(FairseqCriterion):
             student = student_enc_out
             y = torch.ones(student_enc_out.size(0), device=student_enc_out.device)
 
-        loss = self.loss(student, teacher, y)
+        if isinstance(self.loss, CosineEmbeddingLoss):
+            loss = self.loss(student, teacher, y)
+        else:
+            loss = self.loss(student, teacher)
 
         sample_size = teacher_enc_out.size(0)
         logging_output = {

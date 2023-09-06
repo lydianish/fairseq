@@ -25,6 +25,7 @@ from fairseq.models.transformer import (
     base_architecture,
 )
 from fairseq.modules import LayerNorm, TransformerDecoderLayer
+from .character_cnn import CharacterCNN
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,12 @@ class LaserTransformerModel(FairseqEncoderDecoderModel):
             choices=["maxpool", "cls"],
             help="How to build sentence embeddings?",
         )
+        parser.add_argument(
+            "--encoder-character-embeddings",
+            action='store_true',
+            default=False,
+            help="use CharacterCNN word embeddings for the encoder?",
+        )
 
     @classmethod
     def build_model(cls, args, task):
@@ -82,9 +89,12 @@ class LaserTransformerModel(FairseqEncoderDecoderModel):
 
             return Embedding(num_embeddings, embed_dim, padding_idx)
 
-        encoder_embed_tokens = load_embed_tokens(
-            task.source_dictionary, args.encoder_embed_dim
-        )
+        if args.encoder_character_embeddings:
+            encoder_embed_tokens = CharacterCNN()
+        else:
+            encoder_embed_tokens = load_embed_tokens(
+                task.source_dictionary, args.encoder_embed_dim
+            )
         decoder_embed_tokens = load_embed_tokens(
             task.target_dictionary, args.decoder_embed_dim
         )
@@ -117,6 +127,7 @@ class LaserTransformerEncoder(TransformerEncoder):
         tasks = [
             task.split(":")[0] for task in namespace.student_teacher_config.split(",")
         ]
+        laser_embed_dim = 1024
         # if we have a masking task, then add a linear layer projecting from embed_dim to vocab_size
         if "mask" in tasks:
             self.project_vocabulary = nn.Linear(
@@ -132,6 +143,16 @@ class LaserTransformerEncoder(TransformerEncoder):
             )
             self.activation_fn = utils.get_activation_fn("tanh")
             self.layer_norm = LayerNorm(namespace.encoder_embed_dim)
+        # if the embed_dim is different, then add a linear layer projecting from embed_dim to the Laser one (1024)
+        elif namespace.encoder_embed_dim != laser_embed_dim:
+            self.output_projection = nn.Linear(
+                namespace.encoder_embed_dim, laser_embed_dim, bias=False
+            )
+            nn.init.normal_(
+                self.output_projection.weight,
+                mean=0,
+                std=namespace.encoder_embed_dim**-0.5,
+            )
 
     def get_targets(self, sample, net_output):
         """Get targets from either the sample or the net's output."""
@@ -162,6 +183,10 @@ class LaserTransformerEncoder(TransformerEncoder):
             return [x]  # MLM criterion takes first element of list as logits
         else:
             # if not MLM task return sentence embedding
+            
+            if self.output_projection:
+                x = self.output_projection(x)
+
             padding_mask = src_tokens.eq(self.padding_idx).t().unsqueeze(-1)
 
             if padding_mask.any() and self.sentemb_criterion == "maxpool":

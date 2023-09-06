@@ -33,6 +33,7 @@ from fairseq.data import (
     data_utils,
 )
 from fairseq.tasks import LegacyFairseqTask, register_task, setup_task
+from omegaconf import OmegaConf
 
 logger = logging.getLogger(__name__)
 
@@ -243,6 +244,9 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
 
     def build_model(self, args):
         student_model = models.build_model(args, self)
+        logger.info(
+                f"student_model: {student_model}"
+            )
         # initialise student using checkpoint
         if (
             hasattr(args, "student_checkpoint_path")
@@ -252,20 +256,27 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
                 f"initialising student using checkpoint: {args.student_checkpoint_path}"
             )
             student_checkpoint = torch.load(args.student_checkpoint_path)
-            student_encoder_model_checkpoint = get_encoder_model_checkpoint(
-                student_checkpoint["model"]
-            )
+            if "model" in student_checkpoint:
+                student_encoder_model_checkpoint = get_encoder_model_checkpoint(
+                    student_checkpoint["model"]
+                )
+            else:
+                student_encoder_model_checkpoint = get_encoder_model_checkpoint(
+                    student_checkpoint
+                )
             student_model.encoder.load_state_dict(
                 student_encoder_model_checkpoint, strict=False
             )
 
         teacher_checkpoint = torch.load(args.teacher_checkpoint_path)
-        if teacher_checkpoint["args"]:
+        if "args" in teacher_checkpoint: # xlmr
             teacher_args = teacher_checkpoint["args"]
-        else:
+        elif "cfg" in teacher_checkpoint: # laser3
             teacher_args = teacher_checkpoint["cfg"]["model"]
+        else: # laser2
+            teacher_args = get_laser_lstm_args(teacher_checkpoint["params"])
         teacher_args.configfile = args.configfile
-
+        
         teacher_task = setup_task(teacher_args)
 
         # ensure that the teacher's encoder uses the vocab specified in tgt
@@ -273,8 +284,12 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
 
         teacher_model = teacher_task.build_model(teacher_args)
 
+        logger.info(
+                f"teacher model: {teacher_model}"
+            )
+
         with check_before_after_modelsize(teacher_model):
-            teacher_encoder_model_checkpoint = get_encoder_model_checkpoint(
+            teacher_encoder_model_checkpoint = teacher_checkpoint["model"] if teacher_args.arch == "laser_lstm" else get_encoder_model_checkpoint(
                 teacher_checkpoint["model"]
             )
             if hasattr(teacher_model.encoder, "fc_out"):
@@ -830,6 +845,23 @@ def get_encoder_model_checkpoint(state_dict):
             new_state_dict[new_key] = state_dict[key]
     return new_state_dict
 
+def get_laser_lstm_args(args):
+    lstm_args = OmegaConf.create({})
+    lstm_args.task = "laser"
+    lstm_args.arch = "laser_lstm"
+    lstm_args.left_pad_source = args["left_pad"]
+    lstm_args.left_pad_target = args["left_pad"]
+    lstm_args.dropout = 0.0
+    lstm_args.encoder_embed_dim = args["embed_dim"]
+    lstm_args.encoder_hidden_size = args["hidden_size"]
+    lstm_args.encoder_layers = args["num_layers"]
+    lstm_args.encoder_bidirectional = args["bidirectional"]
+    lstm_args.encoder_dropout_out = 0.1
+    lstm_args.decoder_layers = 1
+    lstm_args.decoder_embed_dim = args["embed_dim"]
+    lstm_args.decoder_hidden_size = 2048
+    lstm_args.decoder_lang_embed_dim = 32
+    return lstm_args
 
 # compute weighting per lang
 def compute_weighting_joint(dataset_dict, weighting_alpha):
