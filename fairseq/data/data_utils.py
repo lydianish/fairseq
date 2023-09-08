@@ -383,6 +383,10 @@ def post_process(sentence: str, symbol: str):
         if symbol == "subword_nmt":
             symbol = "@@ "
         sentence = (sentence + " ").replace(symbol, "").rstrip()
+    elif symbol in  {"bert", "##", " ##"}:
+        if symbol == "bert":
+            symbol = " ##"
+        sentence = sentence.replace(symbol, "").rstrip()
     elif symbol == "none":
         pass
     elif symbol is not None:

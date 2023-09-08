@@ -164,7 +164,6 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
             action="store_true",
             help="mask whole words; you may also want to set --bpe",
         )
-
         parser.add_argument(
             "--student-teacher-config",
             type=str,
@@ -200,6 +199,18 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
             type=str,
             help="path to student checkpoint model",
         )
+        parser.add_argument(
+            "--teacher-bpe-symbol",
+            default="sentencepiece",
+            choices=["none", "sentencepiece", "wordpiece", "letter", "silence", "_EOW", "subword_nmt", "bert"],
+            help='BPE sympol used to postprocess and print teacher samples',
+        )
+        parser.add_argument(
+            "--student-bpe-symbol",
+            default="sentencepiece",
+            choices=["none", "sentencepiece", "wordpiece", "letter", "silence", "_EOW", "subword_nmt", "bert"],
+            help='BPE sympol used to postprocess and print student samples',
+        )
 
     def __init__(self, args, config, src_dictionary, tgt_dictionary, num_tasks):
         super().__init__(args)
@@ -208,7 +219,7 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
         self.tgt_dictionary = tgt_dictionary
         self.num_tasks = num_tasks
         self.sample_print = SamplePrint(
-            src_dictionary, tgt_dictionary, interval=1000, samples=5
+            src_dictionary, tgt_dictionary, args.student_bpe_symbol, args.teacher_bpe_symbol, interval=1000, samples=5
         )
         # added to dictionary during setup_task
         self.mask_idx = self.src_dictionary.index("<mask>")
@@ -768,9 +779,11 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
 
 
 class SamplePrint:
-    def __init__(self, source_dictionary, target_dictionary, interval, samples):
+    def __init__(self, source_dictionary, target_dictionary, student_bpe_symbol, teacher_bpe_symbol, interval, samples):
         self.source_dictionary = source_dictionary
         self.target_dictionary = target_dictionary
+        self.student_bpe_symbol = student_bpe_symbol
+        self.teacher_bpe_symbol = teacher_bpe_symbol
         self.interval = interval
         self.samples = samples
         self.counter = 1
@@ -792,7 +805,7 @@ class SamplePrint:
 
         for i in range(min(ln, self.samples)):
             src_str = self.source_dictionary.string(
-                student_src_tokens[i], "sentencepiece"
+                student_src_tokens[i], self.student_bpe_symbol
             )
             if student_teacher_task.task in ["mask", "tlm"]:
                 src_str = self.source_dictionary.string(
@@ -803,7 +816,7 @@ class SamplePrint:
                 )
             else:
                 tgt_str = self.target_dictionary.string(
-                    teacher_src_tokens[i], "sentencepiece"
+                    teacher_src_tokens[i], self.teacher_bpe_symbol
                 )
             logger.info(
                 "\n{}\t\t[{} student ]  {}\n\t\t[{} student ]  {}\n\t\t[{} teacher ]  {}\n\t\t[{} teacher ]  {}\n\t\t\n".format(
