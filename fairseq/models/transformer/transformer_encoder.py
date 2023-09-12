@@ -28,7 +28,6 @@ from fairseq.modules import (
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
 
-
 # rewrite name for backward compatibility in `make_generation_fast_`
 def module_name_fordropout(module_name: str) -> str:
     if module_name == "TransformerEncoderBase":
@@ -131,7 +130,8 @@ class TransformerEncoderBase(FairseqEncoder):
             token_embedding = self.embed_tokens(src_tokens)
         x = embed = self.embed_scale * token_embedding
         if self.embed_positions is not None:
-            x = embed + self.embed_positions(src_tokens)
+            pos_embed =  self.embed_positions(src_tokens)
+            x = embed + pos_embed
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = self.dropout_module(x)

@@ -136,8 +136,9 @@ class CharacterMapper:
 
 
 class CharacterIndexer:
-    def __init__(self) -> None:
+    def __init__(self, dictionary=None) -> None:
         self._mapper = CharacterMapper()
+        self.dictionary = dictionary
 
     def tokens_to_indices(self, tokens: List[str]) -> List[List[int]]:
         return [self._mapper.convert_word_to_char_ids(token) for token in tokens]
@@ -160,6 +161,18 @@ class CharacterIndexer:
         else:
             return padded_batch
 
+    def word_ids_to_char_ids(self, batch: torch.Tensor, maxlen=None) -> torch.Tensor:
+        batch_of_words = [ self.dictionary.string(indices).split() for indices in batch ]
+        if maxlen is None:
+            maxlen = max(map(len, batch))
+        batch_indices = [self.tokens_to_indices(words) for words in batch_of_words]
+        padded_batch = torch.LongTensor([
+            pad_sequence_to_length(
+                indices, maxlen,
+                default_value=self._default_value_for_padding)
+            for indices in batch_indices
+        ]).to(batch.device)
+        return padded_batch
 
 class Highway(torch.nn.Module):
     """
@@ -244,6 +257,7 @@ class CharacterCNN(torch.nn.Module):
             }
         }
         self.output_dim = output_dim
+        self.embedding_dim = output_dim
         self.requires_grad = requires_grad
 
         self._init_weights()

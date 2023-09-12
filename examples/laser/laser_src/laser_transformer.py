@@ -25,10 +25,9 @@ from fairseq.models.transformer import (
     base_architecture,
 )
 from fairseq.modules import LayerNorm, TransformerDecoderLayer
-from .character_cnn import CharacterCNN
+from .character_cnn import CharacterCNN, CharacterIndexer
 
 logger = logging.getLogger(__name__)
-
 
 @register_model("laser_transformer")
 class LaserTransformerModel(FairseqEncoderDecoderModel):
@@ -90,7 +89,7 @@ class LaserTransformerModel(FairseqEncoderDecoderModel):
             return Embedding(num_embeddings, embed_dim, padding_idx)
 
         if args.encoder_character_embeddings:
-            encoder_embed_tokens = CharacterCNN()
+            encoder_embed_tokens = CharacterCNN(args.encoder_embed_dim)
         else:
             encoder_embed_tokens = load_embed_tokens(
                 task.source_dictionary, args.encoder_embed_dim
@@ -153,11 +152,32 @@ class LaserTransformerEncoder(TransformerEncoder):
                 mean=0,
                 std=namespace.encoder_embed_dim**-0.5,
             )
+        # initialize character indexer
+        self.character_embeddings = namespace.encoder_character_embeddings
+        self.indexer = CharacterIndexer(dictionary) if self.character_embeddings else None
 
     def get_targets(self, sample, net_output):
         """Get targets from either the sample or the net's output."""
         return sample["target"]
 
+    def forward_embedding(
+        self, src_tokens, token_embedding: Optional[torch.Tensor] = None
+    ):
+        if self.character_embeddings:
+            character_src_tokens = self.indexer.word_ids_to_char_ids(src_tokens)
+        # embed tokens and positions
+        if token_embedding is None:
+            token_embedding = self.embed_tokens(character_src_tokens) if self.character_embeddings else self.embed_tokens(src_tokens)
+        x = embed = self.embed_scale * token_embedding
+        if self.embed_positions is not None:
+            x = embed + self.embed_positions(src_tokens)
+        if self.layernorm_embedding is not None:
+            x = self.layernorm_embedding(x)
+        x = self.dropout_module(x)
+        if self.quant_noise is not None:
+            x = self.quant_noise(x)
+        return x, embed
+    
     def forward(
         self,
         src_tokens,
@@ -167,6 +187,7 @@ class LaserTransformerEncoder(TransformerEncoder):
         target_language_id=-1,
         dataset_name="",
     ):
+        
         encoder_out = super().forward(src_tokens, src_lengths)
 
         x = encoder_out["encoder_out"][0]  # T x B x D
