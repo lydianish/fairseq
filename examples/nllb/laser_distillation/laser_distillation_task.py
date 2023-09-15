@@ -226,6 +226,8 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
 
     @classmethod
     def setup_task(cls, args, **kwargs):
+        import pdb
+        pdb.set_trace()
         config = json.load(open(args.configfile))
         num_tasks = max([dataset["id"] for dataset in config["train"]]) + 1
 
