@@ -293,8 +293,7 @@ class Dictionary:
         return 0
     
     def _get_duplicate_flags(self):
-        return [ '#fairseq:duplicate' if s in self.symbols[:i] else '' for i, s in enumerate(self.symbols) ]
-
+        return [ '#fairseq:duplicate' if s in self.symbols[:self.nspecial+i] else '' for i, s in enumerate(self.symbols[self.nspecial:]) ]
 
     def save(self, f):
         """Stores dictionary into a text file"""
@@ -304,7 +303,7 @@ class Dictionary:
             zip(
                 ex_keys + self.symbols[self.nspecial :],
                 ex_vals + self.count[self.nspecial :],
-                ex_vals + self._get_duplicate_flags(),
+                self._get_duplicate_flags(),
             ),
         )
 
