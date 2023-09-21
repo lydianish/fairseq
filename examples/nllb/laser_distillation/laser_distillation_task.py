@@ -202,13 +202,13 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
         parser.add_argument(
             "--teacher-bpe-symbol",
             default="sentencepiece",
-            choices=["none", "sentencepiece", "wordpiece", "letter", "silence", "_EOW", "subword_nmt", "bert"],
+            choices=["none", "sentencepiece", "wordpiece", "letter", "silence", "_EOW", "subword_nmt", "roberta"],
             help='BPE sympol used to postprocess and print teacher samples',
         )
         parser.add_argument(
             "--student-bpe-symbol",
             default="sentencepiece",
-            choices=["none", "sentencepiece", "wordpiece", "letter", "silence", "_EOW", "subword_nmt", "bert"],
+            choices=["none", "sentencepiece", "wordpiece", "letter", "silence", "_EOW", "subword_nmt", "roberta"],
             help='BPE sympol used to postprocess and print student samples',
         )
 
@@ -240,7 +240,7 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
             config["src_vocab"] and config["tgt_vocab"]
         ), f"Source and target vocab must be specified"
 
-        # if args.student_bpe_symbol in [ "bert", "none" ] :
+        # if args.student_bpe_symbol in [ "roberta", "none" ] :
         #     src_dictionary = BertDictionary.load(config["src_vocab"])
         # else:
         src_dictionary = Dictionary.load(config["src_vocab"])
