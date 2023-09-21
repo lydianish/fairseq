@@ -223,6 +223,13 @@ class Dictionary:
         <symbol1> <count1>
         ...
         ```
+        <symbol0> <count0> [<flag0>]
+        <symbol1> <count1> [<flag1>]
+        ...
+        ```
+        Possible flags are `#fairseq:overwrite` to overwrite duplicates 
+        and `#fairseq:duplicate` to keep them (for backward compatibility 
+        after bug fix)
         """
         d = cls()
         d.add_from_file(f)
@@ -267,10 +274,10 @@ class Dictionary:
                         "Duplicate word found when loading Dictionary: '{}'. "
                         "Duplicate words can overwrite earlier ones by adding the "
                         "#fairseq:overwrite flag at the end of the corresponding row "
-                        "in the dictionary file. If using the Camembert model, please "
-                        "download an updated copy of the model file. "
-                        "Use the #fairseq:duplicate flag to allow duplicates "
-                        "(backward compatibility after overwrite bug fix).".format(word)
+                        "in the dictionary file. Use the #fairseq:duplicate flag "
+                        "to keep duplicates in the dictionary (backward compatibility "
+                        "after bug fix). If using the Camembert model, please "
+                        "download an updated copy of the model file.".format(word)
                     )
                 self.add_symbol(word, n=count, overwrite=overwrite)
             except ValueError:
@@ -278,12 +285,12 @@ class Dictionary:
                     f"Incorrect dictionary format, expected '<token> <cnt> [flags]': \"{line}\""
                 )
 
-    def _save(self, f, kv_iterator):
+    def _save(self, f, kvf_iterator):
         if isinstance(f, str):
             PathManager.mkdirs(os.path.dirname(f))
             with PathManager.open(f, "w", encoding="utf-8") as fd:
                 return self.save(fd)
-        for k, v, flag in kv_iterator:
+        for k, v, flag in kvf_iterator:
             print("{} {} {}".format(k, v, flag), file=f)
 
     def _get_meta(self):
@@ -292,9 +299,6 @@ class Dictionary:
     def _load_meta(self, lines):
         return 0
     
-    def _get_duplicate_flags(self):
-        return [ '#fairseq:duplicate' if s in self.symbols[:self.nspecial+i] else '' for i, s in enumerate(self.symbols[self.nspecial:]) ]
-
     def save(self, f):
         """Stores dictionary into a text file"""
         ex_keys, ex_vals = self._get_meta()
@@ -303,7 +307,12 @@ class Dictionary:
             zip(
                 ex_keys + self.symbols[self.nspecial :],
                 ex_vals + self.count[self.nspecial :],
-                self._get_duplicate_flags(),
+                [ 
+                    '#fairseq:duplicate' 
+                    if s in self.symbols[:self.nspecial+i] 
+                    else '' 
+                    for i, s in enumerate(self.symbols[self.nspecial:]) 
+                ]
             ),
         )
 
