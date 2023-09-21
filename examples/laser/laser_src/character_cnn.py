@@ -162,7 +162,7 @@ class CharacterIndexer:
             return padded_batch
 
     def word_ids_to_char_ids(self, batch: torch.Tensor, maxlen=None) -> torch.Tensor:
-        batch_of_words = [ self.dictionary.string(indices).split() for indices in batch ]
+        batch_of_words = [ self.dictionary.string(indices, "_EOW").split() for indices in batch ]
         if maxlen is None:
             maxlen = max(map(len, batch))
         batch_indices = [self.tokens_to_indices(words) for words in batch_of_words]
