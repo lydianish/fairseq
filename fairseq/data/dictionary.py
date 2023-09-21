@@ -256,6 +256,9 @@ class Dictionary:
                 if field == "#fairseq:overwrite":
                     overwrite = True
                     line, field = line.rsplit(" ", 1)
+                elif field == "#fairseq:duplicate":
+                    overwrite = False
+                    line, field = line.rsplit(" ", 1)
                 else:
                     overwrite = False
                 count = int(field)
@@ -266,7 +269,9 @@ class Dictionary:
                         "Duplicate words can overwrite earlier ones by adding the "
                         "#fairseq:overwrite flag at the end of the corresponding row "
                         "in the dictionary file. If using the Camembert model, please "
-                        "download an updated copy of the model file.".format(word)
+                        "download an updated copy of the model file. "
+                        "Use the #fairseq:duplicate flag to allow duplicates "
+                        "(backward compatibility after overwrite bug fix).".format(word)
                     )
                 self.add_symbol(word, n=count, overwrite=overwrite)
             except ValueError:
@@ -279,14 +284,18 @@ class Dictionary:
             PathManager.mkdirs(os.path.dirname(f))
             with PathManager.open(f, "w", encoding="utf-8") as fd:
                 return self.save(fd)
-        for k, v in kv_iterator:
-            print("{} {}".format(k, v), file=f)
+        for k, v, flag in kv_iterator:
+            print("{} {} {}".format(k, v, flag), file=f)
 
     def _get_meta(self):
         return [], []
 
     def _load_meta(self, lines):
         return 0
+    
+    def _get_duplicate_flags(self):
+        return [ '#fairseq:duplicate' if s in self.symbols[:i] else '' for i, s in enumerate(self.symbols) ]
+
 
     def save(self, f):
         """Stores dictionary into a text file"""
@@ -296,6 +305,7 @@ class Dictionary:
             zip(
                 ex_keys + self.symbols[self.nspecial :],
                 ex_vals + self.count[self.nspecial :],
+                ex_vals + self._get_duplicate_flags(),
             ),
         )
 
