@@ -251,19 +251,18 @@ class Dictionary:
 
         for line in lines[indices_start_line:]:
             try:
-                
                 line, field = line.rstrip().rsplit(" ", 1)
                 if field == "#fairseq:overwrite":
-                    overwrite = True
+                    overwrite, duplicate = True, False
                     line, field = line.rsplit(" ", 1)
                 elif field == "#fairseq:duplicate":
-                    overwrite = False
+                    overwrite, duplicate = False, True
                     line, field = line.rsplit(" ", 1)
                 else:
-                    overwrite = False
+                    overwrite, duplicate = False, False
                 count = int(field)
                 word = line
-                if word in self and not overwrite:
+                if word in self and not overwrite and not duplicate:
                     raise RuntimeError(
                         "Duplicate word found when loading Dictionary: '{}'. "
                         "Duplicate words can overwrite earlier ones by adding the "
