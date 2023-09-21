@@ -218,18 +218,17 @@ class Dictionary:
     def load(cls, f):
         """Loads the dictionary from a text file with the format:
 
-        ```
-        <symbol0> <count0>
-        <symbol1> <count1>
-        ...
-        ```
-        <symbol0> <count0> [<flag0>]
-        <symbol1> <count1> [<flag1>]
-        ...
-        ```
-        Possible flags are `#fairseq:overwrite` to overwrite duplicates 
-        and `#fairseq:duplicate` to keep them (for backward compatibility 
-        after bug fix)
+        Example::
+            ```
+            <symbol0> <count0> [<flag0>]
+            <symbol1> <count1> [<flag1>]
+            ...
+            ```
+        
+        Note:
+            Possible flags are `#fairseq:overwrite` to overwrite duplicates 
+            and `#fairseq:duplicate` to keep them (for backward compatibility 
+            after bug fix)
         """
         d = cls()
         d.add_from_file(f)
@@ -337,7 +336,7 @@ class Dictionary:
 
         for word in words:
             if add_if_not_exist:
-                idx = self.add_symbol(word)
+                idx = self.add_symbol(word, overwrite=True)
             else:
                 idx = self.index(word)
             if consumer is not None:
@@ -367,7 +366,7 @@ class Dictionary:
     def add_file_to_dictionary(filename, dict, tokenize, num_workers):
         def merge_result(counter):
             for w, c in sorted(counter.items()):
-                dict.add_symbol(w, c)
+                dict.add_symbol(w, c, overwrite=True)
 
         local_file = PathManager.get_local_path(filename)
         offsets = find_offsets(local_file, num_workers)
