@@ -219,7 +219,7 @@ class LaserDistillationTask(LegacyFairseqTask):  # TODO: move to FairseqTask
         self.tgt_dictionary = tgt_dictionary
         self.num_tasks = num_tasks
         self.sample_print = SamplePrint(
-            src_dictionary, tgt_dictionary, args.student_bpe_symbol, args.teacher_bpe_symbol, interval=1000, samples=5
+            src_dictionary, tgt_dictionary, args.student_bpe_symbol, args.teacher_bpe_symbol, interval=1000, samples=2
         )
         # added to dictionary during setup_task
         if isinstance(self.src_dictionary, BertDictionary):
