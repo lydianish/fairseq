@@ -906,14 +906,37 @@ def check_before_after_modelsize(model):
     after = get_model_size("after", model)
     assert before != after
 
-
 def get_encoder_model_checkpoint(state_dict):
     new_state_dict = OrderedDict()
     for key in state_dict.keys():
-        if key.startswith("encoder"):
-            new_key = map_transformer_layer_attribute_names(key[len("encoder."):])
+        tmp_key = key.replace("character_bert.", "")
+        if tmp_key.startswith("embeddings") or tmp_key.startswith("encoder"):
+            new_key = map_transformer_layer_attribute_names(tmp_key)
             new_state_dict[new_key] = state_dict[key]
     return new_state_dict
+
+def map_transformer_layer_attribute_names(key):
+    new_key = key
+    for substring in HUGGINGFACE_TO_FAIRSEQ_KEY_MAPPING.keys():
+        if substring in key:
+            new_key = new_key.replace(substring, HUGGINGFACE_TO_FAIRSEQ_KEY_MAPPING[substring])
+    return new_key
+
+HUGGINGFACE_TO_FAIRSEQ_KEY_MAPPING = {
+    "embeddings.word_embeddings": "embed_tokens",
+    "embeddings.position_embeddings": "embed_positions",
+    "embeddings.LayerNorm": "layernorm_embedding",
+    "encoder.": "",
+    "layer.": "layers.",
+    "attention.self.query": "self_attn.q_proj",
+    "attention.self.key": "self_attn.k_proj",
+    "attention.self.value": "self_attn.v_proj",
+    "attention.output.dense": "self_attn.out_proj",
+    "attention.output.LayerNorm": "self_attn_layer_norm",
+    "intermediate.dense": "fc1",
+    "output.dense": "fc2",
+    "output.LayerNorm": "final_layer_norm"
+}
 
 def get_laser_lstm_args(args):
     lstm_args = OmegaConf.create({})
@@ -932,25 +955,6 @@ def get_laser_lstm_args(args):
     lstm_args.decoder_hidden_size = 2048
     lstm_args.decoder_lang_embed_dim = 32
     return lstm_args
-
-HUGGINGFACE_TO_FAIRSEQ_KEY_MAPPING = {
-    "layer.": "layers.",
-    "attention.self.query": "self_attn.q_proj",
-    "attention.self.key": "self_attn.k_proj",
-    "attention.self.value": "self_attn.v_proj",
-    "attention.output.dense": "self_attn.out_proj",
-    "attention.output.LayerNorm": "self_attn_layer_norm",
-    "intermediate.dense": "fc1",
-    "output.dense": "fc2",
-    "output.LayerNorm": "final_layer_norm"
-}
-
-def map_transformer_layer_attribute_names(key):
-    new_key = key
-    for substring in HUGGINGFACE_TO_FAIRSEQ_KEY_MAPPING.keys():
-        if substring in key:
-            new_key = new_key.replace(substring, HUGGINGFACE_TO_FAIRSEQ_KEY_MAPPING[substring])
-    return new_key
 
 # compute weighting per lang
 def compute_weighting_joint(dataset_dict, weighting_alpha):
