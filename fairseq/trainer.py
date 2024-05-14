@@ -908,6 +908,10 @@ class Trainer(object):
         # forward and backward pass
         logging_outputs, sample_size, ooms = [], 0, 0
         for i, sample in enumerate(samples):  # delayed update loop
+            print('source', sample['net_input']['src_tokens'].shape)
+            print(sample['net_input']['src_tokens'])
+            print('target', sample['target'].shape)
+            print(sample['target'])
             sample, is_dummy_batch = self._prepare_sample(sample)
 
             # MoE training with --batch-size or --max-sentences set
