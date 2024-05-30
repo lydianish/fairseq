@@ -9,18 +9,31 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
-from torch.nn import MSELoss, CosineEmbeddingLoss
+from torch.nn import Module, MSELoss, CosineEmbeddingLoss
+import torch.linalg as LA
 
 from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
 
+class SNRLoss(Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, predictions, targets):
+        batch_loss = LA.vector_norm(targets - predictions, ord=2, dim=-1) / LA.vector_norm(targets, ord=2, dim=-1) 
+        return torch.sum(batch_loss)
 
 @register_criterion("encoder_similarity")
 class EncoderSimilarityCriterion(FairseqCriterion):
-    def __init__(self, task, sentence_avg, contrast, margin, mse):
+    def __init__(self, task, sentence_avg, contrast, margin, distil_loss):
         super().__init__(task)
         self.sentence_avg = sentence_avg
-        self.loss = CosineEmbeddingLoss(margin=margin, reduction="sum") if not mse else MSELoss(reduction="sum")
+        if distil_loss = "mse":
+            self.loss = MSELoss(reduction="sum")
+        elif distil_loss == "snr":
+            self.loss = SNRLoss()
+        else: # distil_loss == "cos"
+            self.loss = CosineEmbeddingLoss(margin=margin, reduction="sum")
         self.contrast = contrast
 
     @staticmethod
@@ -32,8 +45,8 @@ class EncoderSimilarityCriterion(FairseqCriterion):
 
         parser.add_argument('--margin', default=0., type=float,
                             help='cosine margin for negative sampling')
-        parser.add_argument('--mse', default=False, action='store_true',
-                            help='use MSE as distillation loss (instead of cosine)')
+        parser.add_argument('--distil-loss', default='cos', type=str, choices=['cos', 'mse', 'snr'],
+                            help='use cosine, MSE or Signal-to-Noise Ratio as distillation loss')
         # fmt: on
 
     def forward(self, model, sample, teacher_order, reduce=True):
