@@ -28,7 +28,7 @@ class EncoderSimilarityCriterion(FairseqCriterion):
     def __init__(self, task, sentence_avg, contrast, margin, distil_loss):
         super().__init__(task)
         self.sentence_avg = sentence_avg
-        if distil_loss = "mse":
+        if distil_loss == "mse":
             self.loss = MSELoss(reduction="sum")
         elif distil_loss == "snr":
             self.loss = SNRLoss()
