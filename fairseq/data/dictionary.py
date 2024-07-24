@@ -131,7 +131,7 @@ class Dictionary:
             self.count[idx] = self.count[idx] + n
             return idx
         else:
-            idx = len(self.indices)
+            idx = len(self.symbols)
             self.indices[word] = idx
             self.symbols.append(word)
             self.count.append(n)
