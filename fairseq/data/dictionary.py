@@ -124,12 +124,20 @@ class Dictionary:
         else:
             return self.unk_word
 
-    def add_symbol(self, word, n=1, overwrite=True):
+    def add_symbol(self, word, n=1, overwrite=True, duplicate=False):
         """Adds a word to the dictionary"""
-        if word in self.indices and overwrite:
-            idx = self.indices[word]
-            self.count[idx] = self.count[idx] + n
-            return idx
+        assert not (overwrite and duplicate), "Select only one strategy to deal with duplicate words in the dictionary: 'overwrite=True' or 'duplicate=True'."
+        if word in self.indices:
+            if overwrite:
+                idx = self.indices[word]
+                self.count[idx] = self.count[idx] + n
+                return idx
+            if duplicate:
+                idx = len(self.indices)
+                self.indices[word] = idx
+                self.symbols.append(word)
+                self.count.append(n)
+                return idx
         else:
             idx = len(self.symbols)
             self.indices[word] = idx
@@ -254,15 +262,15 @@ class Dictionary:
 
         lines = f.readlines()
         indices_start_line = self._load_meta(lines)
-
+        
         for line in lines[indices_start_line:]:
             try:
                 line, field = line.rstrip().rsplit(" ", 1)
                 if field == "#fairseq:overwrite":
-                    overwrite = True
+                    overwrite, duplicate = True, False
                     line, field = line.rsplit(" ", 1)
                 elif field == "#fairseq:duplicate":
-                    overwrite = False
+                    overwrite, duplicate = False, True
                     line, field = line.rsplit(" ", 1)
                 else:
                     if line in self:
@@ -275,10 +283,10 @@ class Dictionary:
                             "after bug fix). If using the Camembert model, please "
                             "download an updated copy of the model file.".format(word)
                         )
-                    overwrite = True # default behaviour
+                    overwrite, duplicate = True, False # default behaviour
                 count = int(field)
                 word = line
-                self.add_symbol(word, n=count, overwrite=overwrite)
+                self.add_symbol(word, n=count, overwrite=overwrite, duplicate=duplicate)
             except ValueError:
                 raise ValueError(
                     f"Incorrect dictionary format, expected '<token> <cnt> [flags]': \"{line}\""
